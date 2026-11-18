@@ -41,8 +41,20 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "fetch":
         from landmem.fetch import STEPS
+        log = logging.getLogger("landmem.cli")
+        failed = []
         for step in args.steps:
-            STEPS[step](cfg, args.workers)
+            for attempt in range(1, 4):  # each pass resumes from what is already mirrored
+                try:
+                    STEPS[step](cfg, args.workers)
+                    break
+                except OSError as err:
+                    log.warning("fetch %s pass %d failed: %s", step, attempt, err)
+            else:
+                failed.append(step)
+        if failed:
+            log.error("fetch incomplete for: %s (rerun to resume)", ", ".join(failed))
+            return 1
     elif args.command == "covariates":
         from landmem.covariates import build_covariates
         build_covariates(cfg)

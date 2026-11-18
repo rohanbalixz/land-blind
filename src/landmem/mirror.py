@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import http.client
 import json
 import logging
 import threading
@@ -106,7 +107,8 @@ def fetch_key(store: Store, key: str, *, retries: int = 6, timeout: float = 120.
             if err.code == 404:
                 raise FileNotFoundError(store.url(key)) from err
             reason: Exception = err
-        except (OSError, TimeoutError) as err:  # URLError is an OSError subclass
+        except (OSError, TimeoutError, http.client.HTTPException) as err:
+            # URLError is an OSError; IncompleteRead (truncated body) is an HTTPException.
             reason = err
         if attempt == retries:
             raise OSError(f"giving up on {key} after {retries} attempts: {reason}") from reason
@@ -124,15 +126,23 @@ def fetch_keys(store: Store, keys: Sequence[str], *, workers: int = 4, label: st
         return 0
     log.info("%s: %d of %d objects to download", label or store.path, len(pending), len(keys))
     total, done, start = 0, 0, time.monotonic()
+    failed: list[str] = []
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(fetch_key, store, k): k for k in pending}
         for future in as_completed(futures):
-            total += future.result()
             done += 1
+            try:
+                total += future.result()
+            except Exception as err:  # keep going; report every failure at the end
+                failed.append(futures[future])
+                log.error("%s: failed %s (%s)", label or store.path, futures[future], err)
             if done % 50 == 0 or done == len(pending):
                 rate = total / max(time.monotonic() - start, 1e-9) / 1e6
                 log.info("%s: %d/%d objects, %.2f GB, %.2f MB/s",
                          label or store.path, done, len(pending), total / 1e9, rate)
+    if failed:
+        raise OSError(f"{len(failed)} object(s) of {label or store.path} failed, e.g. {failed[0]}; "
+                      "rerun to resume")
     return total
 
 

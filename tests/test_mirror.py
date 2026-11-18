@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import http.client
 import json
 
 import pytest
@@ -49,3 +50,38 @@ def test_fetch_key_rejects_corrupt_download(tmp_path, monkeypatch):
     with pytest.raises(OSError, match="giving up"):
         fetch_key(store, "x/0.0.0", retries=2)
     assert not (store.local / "x/0.0.0").exists()
+
+
+def test_fetch_key_retries_truncated_reads(tmp_path, monkeypatch):
+    body = b"payload"
+    md5 = base64.b64encode(hashlib.md5(body).digest()).decode()
+    calls = {"n": 0}
+
+    def flaky(url, timeout):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise http.client.IncompleteRead(b"pay", 4)
+        return body, md5
+
+    monkeypatch.setattr(mirror, "_download", flaky)
+    monkeypatch.setattr(mirror.time, "sleep", lambda s: None)
+    store = Store("https://example.invalid", "datasets/test.zarr", tmp_path)
+    assert fetch_key(store, "x/0.0.0") == len(body)
+    assert calls["n"] == 2
+
+
+def test_fetch_keys_reports_failures_after_finishing_others(tmp_path, monkeypatch):
+    def download(url, timeout):
+        if url.endswith("bad"):
+            raise urllib_error()
+        return b"ok", None
+
+    def urllib_error():
+        import urllib.error
+        return urllib.error.HTTPError(url="u", code=404, msg="missing", hdrs=None, fp=None)
+
+    monkeypatch.setattr(mirror, "_download", download)
+    store = Store("https://example.invalid", "datasets/test.zarr", tmp_path)
+    with pytest.raises(OSError, match="1 object"):
+        mirror.fetch_keys(store, ["x/good", "x/bad", "x/good2"], workers=2)
+    assert (store.local / "x/good").exists() and (store.local / "x/good2").exists()
