@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software or its results, please cite it as below."
+title: "land-memory: do AI weather ensembles miss the soil moisture they never see?"
+type: software
+authors:
+  - family-names: Bali
+    given-names: Rohan
+version: 0.1.0
+license: MIT
+keywords:
+  - AI weather prediction
+  - ensemble forecasting
+  - soil moisture
+  - land-atmosphere coupling
+  - forecast evaluation
+  - pre-registration

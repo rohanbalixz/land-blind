@@ -9,4 +9,4 @@ anomaly, using the physics-based IFS ensemble, which has a land model, as the co
 **Status:** pre-registered on 2026-11-18 ([`docs/preregistration.md`](docs/preregistration.md)).
 Analysis in progress.
 
-Licence: MIT (code). Data licences are listed in `docs/data.md`.
+Licence: MIT (code). Data sources and licences: [`docs/data.md`](docs/data.md).
