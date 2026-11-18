@@ -1,0 +1,86 @@
+# Analysis parameters. Registered with docs/preregistration.md on 2026-11-18.
+# Changing any value after registration is a deviation and must be logged in docs/deviations.md.
+
+bucket_url: https://storage.googleapis.com/weatherbench2
+data_dir: data
+
+stores:
+  era5_daily: datasets/era5_daily/1959-2023_01_10-1h-240x121_equiangular_with_poles_conservative.zarr
+  era5_6h: datasets/era5/1959-2023_01_10-6h-240x121_equiangular_with_poles_conservative.zarr
+  hres_t0: datasets/hres_t0/2016-2022-6h-240x121_equiangular_with_poles_conservative.zarr
+  fgn_mean: datasets/fgn/2022-240x121_equiangular_with_poles_conservative_mean.zarr
+  fgn_members: datasets/fgn/2022-240x121_equiangular_with_poles_conservative.zarr
+  gencast_mean: datasets/gencast/2020-240x121_equiangular_with_poles_conservative_mean.zarr
+  ifs_mean: datasets/ifs_ens/2018-2022-240x121_equiangular_with_poles_conservative_mean.zarr
+  ifs_members: datasets/ifs_ens/2018-2022-240x121_equiangular_with_poles_conservative.zarr
+
+# Model pairs: AI system, physics control, year, verifying analysis.
+pairs:
+  fgn2022:
+    ai: fgn_mean
+    ifs: ifs_mean
+    year: 2022
+    truth: hres_t0
+    alt_truth: era5_6h
+    step_hours: 6
+  gencast2020:
+    ai: gencast_mean
+    ifs: ifs_mean
+    year: 2020
+    truth: era5_6h
+    alt_truth: hres_t0
+    step_hours: 12
+
+init_hour_utc: 0
+lead_days: [1, 15]            # inclusive range analysed
+primary_lead_days: [3, 10]    # inclusive range averaged into the primary summary
+lead_growth_early: [1, 2]
+lead_growth_late: [7, 10]
+afternoon_lst: 15.0
+night_lst: 3.0
+max_hour_offset: 3.0          # hours between target LST and the nearest available UTC step
+
+climatology_years: [1990, 2019]
+doy_half_window: 15
+quantile_half_window: 7
+hot_quantile: 0.90
+
+domain:
+  land_sea_mask_min: 0.5
+  lat_min: -60.0
+  lat_max: 80.0
+  min_soil_moisture_sd: 0.005   # m3 m-3, warm-season daily root-zone anomalies
+
+root_zone_weights: {volumetric_soil_water_layer_1: 7, volumetric_soil_water_layer_2: 21, volumetric_soil_water_layer_3: 72}
+warm_season_months: 3
+coupling_terciles: true
+
+strata:
+  dry_max: -0.4307   # standard-normal tercile bounds
+  wet_min: 0.4307
+
+inference:
+  block_days: 7
+  block_days_alt: 14
+  n_boot: 2000
+  seed: 20261118
+  alpha: 0.05
+  sesoi: 0.10                 # K per standard deviation of soil-moisture anomaly
+  driscoll_kraay_lags: 7
+
+members:
+  lead_day: 5
+  init_every_n_days: 2
+
+placebo_years: [1990, 2019]
+injection_kappas: [0.05, 0.10, 0.20]
+
+# Continent boxes for the leave-one-out check: [lon_min, lon_max, lat_min, lat_max], degrees east.
+# A cell is assigned to the first box that contains it.
+continents:
+  north_america: [-170.0, -50.0, 7.0, 80.0]
+  south_america: [-95.0, -30.0, -60.0, 13.0]
+  europe: [-25.0, 45.0, 35.0, 72.0]
+  africa: [-20.0, 55.0, -36.0, 35.0]
+  oceania: [110.0, 180.0, -50.0, -10.0]
+  asia: [25.0, 180.0, -11.0, 80.0]

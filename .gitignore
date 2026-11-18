@@ -1,0 +1,18 @@
+# Data and run artefacts (rebuilt by the pipeline)
+data/
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Editors and OS
+.DS_Store
+.vscode/
+.idea/
