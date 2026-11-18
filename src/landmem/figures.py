@@ -131,7 +131,8 @@ def regime_map(cfg: Config) -> None:
     ax = fig.add_subplot(1, 1, 1, projection=ccrs.Robinson())
     ax.set_global()
     ax.add_feature(cfeature.COASTLINE, linewidth=0.3, edgecolor=INK_2)
-    cmap = mpl.colors.ListedColormap([SEQ[min(int(i), 6)] for i in np.linspace(0, 6.99, 10)])
+    ramp = mpl.colors.LinearSegmentedColormap.from_list("seq", SEQ)
+    cmap = mpl.colors.ListedColormap(ramp(np.linspace(0, 1, 10)))
     sc = ax.scatter(lon, lat, c=dec, cmap=cmap, vmin=0.5, vmax=10.5, s=3.2, marker="s", lw=0,
                     transform=ccrs.PlateCarree())
     ax.scatter(lon[water], lat[water], s=3.2, marker="s", facecolor="none", edgecolor=AI,

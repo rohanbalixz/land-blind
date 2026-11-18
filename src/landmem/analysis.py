@@ -431,7 +431,10 @@ def run_analysis(cfg: Config, skip_members: bool = False) -> dict:
         "domain": {"n_cells": int(cov.sizes["cell"]),
                    "n_water": int((cov.regime.values.astype(str) == "water").sum()),
                    "n_energy": int((cov.regime.values.astype(str) == "energy").sum()),
-                   "tci_tercile_bounds": list(map(float, cov.attrs["tci_tercile_bounds"]))},
+                   "tci_tercile_bounds": list(map(float, cov.attrs["tci_tercile_bounds"])),
+                   "water_cells_by_continent": pd.Series(
+                       cov.continent.values.astype(str)[cov.regime.values.astype(str) == "water"]
+                   ).value_counts().to_dict()},
         "pairs": {},
     }
     for name in cfg["pairs"]:
