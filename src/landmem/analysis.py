@@ -311,6 +311,9 @@ def analyze_pair(cfg: Config, cov: xr.Dataset, name: str) -> dict:
     loo = {}
     for cont in sorted(set(p.continent[(p.regime == "water") & p.usable])):
         mc = water & (p.continent != cont)[None, :]
+        if not mc.any():
+            loo[cont] = {"skipped": "no water-limited cells outside this continent"}
+            continue
         fc = fit(p, mc, {"ai": e_ai, "ifs": e_ifs})
         loo[cont] = {"beta_ai": summary_mean(fc.sums["ai"], prim, counts, cfg)["estimate"],
                      "delta": summary_mean(diff(fc.sums["ai"], fc.sums["ifs"]), prim, counts,
