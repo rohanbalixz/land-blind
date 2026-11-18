@@ -13,6 +13,7 @@ import xarray as xr
 
 from landmem.climatology import in_season
 from landmem.config import Config
+from landmem.report import render
 from landmem.stats import (
     Sample,
     SlopeSums,
@@ -461,5 +462,6 @@ def run_analysis(cfg: Config, skip_members: bool = False) -> dict:
                                    float_format="%.5f")
         pd.DataFrame(res["S4_dose_response"]["deciles"]).to_csv(
             out_dir / "tables" / f"coupling_deciles_{name}.csv", index=False, float_format="%.5f")
-    log.info("wrote %s", out_dir / "results.json")
+    (out_dir / "summary.md").write_text(render(results))
+    log.info("wrote %s and %s", out_dir / "results.json", out_dir / "summary.md")
     return results
