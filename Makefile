@@ -9,6 +9,7 @@ env:
 
 lint:
 	ruff check src tests scripts
+	mypy
 
 test:
 	$(PY) -m pytest

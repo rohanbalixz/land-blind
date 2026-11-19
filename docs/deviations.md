@@ -21,3 +21,4 @@ exactly what was added once the results were known.
 | 5 | 2026-11-18 | S3–S5 are also reported for GenCast. The plan registered them for FGN only; the GenCast rows are labelled "not registered". | None. |
 | 6 | 2026-11-18 | Figure 5 (hot-day probabilities by soil-moisture stratum) added. | None (presentation of S7). |
 | 7 | 2026-11-18 | Project renamed from `land-memory` to `land-blind` (Python package `landmem` → `landblind`) for publication. The registered files are byte-identical (SHA-256 unchanged). | None. |
+| 8 | 2026-11-18 | `analyze_pair` split into one function per registered analysis; mypy type checking added to CI. | None: rerun results identical (checked in the commit that regenerated them). |

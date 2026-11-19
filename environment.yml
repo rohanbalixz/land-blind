@@ -18,4 +18,4 @@ dependencies:
   - ruff=0.17.5
   - pip
   - pip:
-      - -e .
+      - -e ".[dev]"

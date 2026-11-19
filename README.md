@@ -82,7 +82,10 @@ All of the following were predicted in the pre-registration:
 9.5% chance at lead day 5; such afternoons happen 12.5% of the time. Over wet soils the figures are
 4.2% and 3.6%, so FGN's hot-day probabilities respond too little to the land
 ([figure](results/figures/fig5_hot_day_probability.png)). IFS ENS over-forecasts hot afternoons in
-both strata (20.5% and 8.9%), so its higher dry-soil probability is not better calibration.
+both strata (20.5% and 8.9%), so its higher dry-soil probability is not better calibration. The hot
+threshold is ERA5's 90th percentile, but 2022 is verified against HRES-t0, which runs about 0.55 K
+colder in the afternoon over land. So the observed base rate across all cells and dates is 9.1%, not
+10%. All three are scored against the same event, so the comparison between them stands.
 
 ### What does not fit cleanly
 
@@ -120,6 +123,12 @@ The plan, with every threshold and the reading of each possible outcome fixed in
 before any forecast, analysis or reanalysis value was read, and is tagged `preregistration`. Every
 later change is dated in [`docs/deviations.md`](docs/deviations.md), including one clarification
 made before any data were read and the exploratory additions made after the results were seen.
+
+**How far the date can be checked.** The repository was first pushed to GitHub on 2026-11-18, after
+the analysis had run. The plan's date therefore rests on its local commit timestamp (2026-11-18,
+14:10 EST), not on an external registry. What a reader can verify: the plan is the first commit of
+the analysis history, its SHA-256 is identical in every later commit, and each later step is its own
+dated commit, including the changes made after the results were seen.
 
 ## Reproduce
 

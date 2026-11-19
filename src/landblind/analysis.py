@@ -6,6 +6,7 @@ import json
 import logging
 import subprocess
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -95,12 +96,15 @@ def load_pair(cfg: Config, cov: xr.Dataset, name: str) -> PairData:
     )
 
 
-def all_finite(*arrays: np.ndarray) -> np.ndarray:
+def all_finite(first: np.ndarray, *rest: np.ndarray) -> np.ndarray:
     """(init, cell) mask: every array finite (over all lead days for 3-D arrays)."""
-    ok = None
-    for a in arrays:
-        f = np.isfinite(a).all(axis=1) if a.ndim == 3 else np.isfinite(a)
-        ok = f if ok is None else ok & f
+
+    def finite(a: np.ndarray) -> np.ndarray:
+        return np.isfinite(a).all(axis=1) if a.ndim == 3 else np.isfinite(a)
+
+    ok = finite(first)
+    for a in rest:
+        ok = ok & finite(a)
     return ok
 
 
@@ -168,10 +172,47 @@ def profile(sums: SlopeSums, counts: np.ndarray) -> dict:
 
 
 # --------------------------------------------------------------------------------------------
-# Per-pair analysis
+# Per-pair analysis: one function per registered analysis
 # --------------------------------------------------------------------------------------------
 
-def analyze_pair(cfg: Config, cov: xr.Dataset, name: str) -> dict:
+@dataclass
+class PairContext:
+    """Inputs, samples and bootstrap counts shared by every test of one model pair."""
+
+    cfg: Config
+    cov: xr.Dataset
+    name: str
+    p: PairData
+    lead_days: np.ndarray
+    prim: np.ndarray        # lead-day columns averaged into the primary summary
+    early: np.ndarray
+    late: np.ndarray
+    counts: np.ndarray      # 7-day block-bootstrap counts
+    counts14: np.ndarray    # 14-day block-bootstrap counts (R3)
+    core: np.ndarray        # in season, usable, all covariates and leads finite
+    water: np.ndarray       # core & water-limited (the primary sample)
+    energy: np.ndarray      # core & energy-limited
+
+    @property
+    def e_ai(self) -> np.ndarray:
+        return self.p.e["ai_afternoon"]
+
+    @property
+    def e_ifs(self) -> np.ndarray:
+        return self.p.e["ifs_afternoon"]
+
+    def pair_fit(self, mask: np.ndarray, **kwargs: Any) -> Fit:
+        """AI and IFS ENS afternoon errors fitted together on ``mask``."""
+        return fit(self.p, mask, {"ai": self.e_ai, "ifs": self.e_ifs}, **kwargs)
+
+    def summary(self, sums: SlopeSums, counts: np.ndarray | None = None) -> dict:
+        return summary_mean(sums, self.prim, self.counts if counts is None else counts, self.cfg)
+
+    def mean(self, sums: SlopeSums) -> tuple[float, np.ndarray]:
+        return lead_mean(sums, self.prim, self.counts)
+
+
+def make_context(cfg: Config, cov: xr.Dataset, name: str) -> PairContext:
     p = load_pair(cfg, cov, name)
     inf = cfg["inference"]
     lead_days = np.arange(cfg["lead_days"][0], cfg["lead_days"][1] + 1)
@@ -179,173 +220,213 @@ def analyze_pair(cfg: Config, cov: xr.Dataset, name: str) -> dict:
     def cols(rng: list[int]) -> np.ndarray:
         return np.flatnonzero((lead_days >= rng[0]) & (lead_days <= rng[1]))
 
-    prim, early, late = cols(cfg["primary_lead_days"]), cols(cfg["lead_growth_early"]), \
-        cols(cfg["lead_growth_late"])
-    counts = block_counts(p.dates.size, inf["block_days"], inf["n_boot"], inf["seed"])
-    counts14 = block_counts(p.dates.size, inf["block_days_alt"], inf["n_boot"], inf["seed"])
+    core = (p.season & p.usable[None, :] & all_finite(p.s, p.a1, p.a2)
+            & all_finite(p.e["ai_afternoon"], p.e["ifs_afternoon"]))
+    return PairContext(
+        cfg=cfg, cov=cov, name=name, p=p, lead_days=lead_days,
+        prim=cols(cfg["primary_lead_days"]), early=cols(cfg["lead_growth_early"]),
+        late=cols(cfg["lead_growth_late"]),
+        counts=block_counts(p.dates.size, inf["block_days"], inf["n_boot"], inf["seed"]),
+        counts14=block_counts(p.dates.size, inf["block_days_alt"], inf["n_boot"], inf["seed"]),
+        core=core, water=core & (p.regime == "water")[None, :],
+        energy=core & (p.regime == "energy")[None, :])
 
-    e_ai, e_ifs = p.e["ai_afternoon"], p.e["ifs_afternoon"]
-    covariates_ok = all_finite(p.s, p.a1, p.a2)
-    core = p.season & p.usable[None, :] & covariates_ok & all_finite(e_ai, e_ifs)
-    water = core & (p.regime == "water")[None, :]
-    energy = core & (p.regime == "energy")[None, :]
-    out: dict = {}
 
-    # ---- primary -----------------------------------------------------------------------------
-    f = fit(p, water, {"ai": e_ai, "ifs": e_ifs})
+def primary(ctx: PairContext) -> tuple[dict, Fit, SlopeSums]:
+    """H1-H4 estimates, the lead profile, and the primary fit reused by later tests."""
+    f = ctx.pair_fit(ctx.water)
     d = diff(f.sums["ai"], f.sums["ifs"])
-    out["sample_primary"] = f.describe()
-    out["primary"] = {
-        "beta_ai": summary_mean(f.sums["ai"], prim, counts, cfg),
-        "beta_ifs": summary_mean(f.sums["ifs"], prim, counts, cfg),
-        "delta": summary_mean(d, prim, counts, cfg),
+    out = {
+        "sample_primary": f.describe(),
+        "primary": {"beta_ai": ctx.summary(f.sums["ai"]), "beta_ifs": ctx.summary(f.sums["ifs"]),
+                    "delta": ctx.summary(d)},
+        "lead_profile": {"lead_day": ctx.lead_days.tolist(),
+                         "ai": profile(f.sums["ai"], ctx.counts),
+                         "ifs": profile(f.sums["ifs"], ctx.counts),
+                         "delta": profile(d, ctx.counts)},
     }
-    out["lead_profile"] = {"lead_day": lead_days.tolist(), "ai": profile(f.sums["ai"], counts),
-                           "ifs": profile(f.sums["ifs"], counts), "delta": profile(d, counts)}
+    return out, f, d
 
-    # ---- S1 lead growth ------------------------------------------------------------------------
-    v_late, b_late = lead_mean(d, late, counts)
-    v_early, b_early = lead_mean(d, early, counts)
-    out["S1_lead_growth"] = summarize(v_late - v_early, b_late - b_early)
 
-    # ---- S2 diurnal fingerprint (6-hourly systems only) ------------------------------------------
-    if p.night_usable.any() and cfg["pairs"][name]["step_hours"] == 6:
-        both = water & p.night_usable[None, :] & all_finite(p.e["ai_night"], p.e["ifs_night"])
-        fd = fit(p, both, {"ai": e_ai, "ifs": e_ifs, "ai_n": p.e["ai_night"],
-                           "ifs_n": p.e["ifs_night"]})
-        va, ba = lead_mean(diff(fd.sums["ai"], fd.sums["ifs"]), prim, counts)
-        vn, bn = lead_mean(diff(fd.sums["ai_n"], fd.sums["ifs_n"]), prim, counts)
-        out["S2_diurnal"] = {"delta_afternoon": summarize(va, ba), "delta_night": summarize(vn, bn),
-                             "afternoon_minus_night": summarize(va - vn, ba - bn),
-                             "sample": fd.describe()}
+def lead_growth(ctx: PairContext, d: SlopeSums) -> dict:
+    """S1: the AI - IFS gap at lead days 7-10 minus the gap at lead days 1-2."""
+    v_late, b_late = lead_mean(d, ctx.late, ctx.counts)
+    v_early, b_early = lead_mean(d, ctx.early, ctx.counts)
+    return summarize(v_late - v_early, b_late - b_early)
 
-    # ---- S3 regime contrast ----------------------------------------------------------------------
-    fe_ = fit(p, energy, {"ai": e_ai, "ifs": e_ifs})
+
+def diurnal(ctx: PairContext) -> dict | None:
+    """S2: afternoon minus night gap, for 6-hourly systems only."""
+    p = ctx.p
+    if not p.night_usable.any() or ctx.cfg["pairs"][ctx.name]["step_hours"] != 6:
+        return None
+    both = ctx.water & p.night_usable[None, :] & all_finite(p.e["ai_night"], p.e["ifs_night"])
+    fd = fit(p, both, {"ai": ctx.e_ai, "ifs": ctx.e_ifs, "ai_n": p.e["ai_night"],
+                       "ifs_n": p.e["ifs_night"]})
+    va, ba = ctx.mean(diff(fd.sums["ai"], fd.sums["ifs"]))
+    vn, bn = ctx.mean(diff(fd.sums["ai_n"], fd.sums["ifs_n"]))
+    return {"delta_afternoon": summarize(va, ba), "delta_night": summarize(vn, bn),
+            "afternoon_minus_night": summarize(va - vn, ba - bn), "sample": fd.describe()}
+
+
+def regime_contrast(ctx: PairContext, f: Fit, d: SlopeSums) -> dict:
+    """S3: water-limited minus energy-limited cells."""
+    fe_ = ctx.pair_fit(ctx.energy)
     de = diff(fe_.sums["ai"], fe_.sums["ifs"])
-    vw, bw = lead_mean(d, prim, counts)
-    ve, be = lead_mean(de, prim, counts)
-    aw, baw = lead_mean(f.sums["ai"], prim, counts)
-    ae, bae = lead_mean(fe_.sums["ai"], prim, counts)
-    out["S3_regime"] = {"delta_energy": summarize(ve, be), "beta_ai_energy": summarize(ae, bae),
-                        "delta_water_minus_energy": summarize(vw - ve, bw - be),
-                        "beta_ai_water_minus_energy": summarize(aw - ae, baw - bae),
-                        "sample_energy": fe_.describe()}
+    vw, bw = ctx.mean(d)
+    ve, be = ctx.mean(de)
+    aw, baw = ctx.mean(f.sums["ai"])
+    ae, bae = ctx.mean(fe_.sums["ai"])
+    return {"delta_energy": summarize(ve, be), "beta_ai_energy": summarize(ae, bae),
+            "delta_water_minus_energy": summarize(vw - ve, bw - be),
+            "beta_ai_water_minus_energy": summarize(aw - ae, baw - bae),
+            "sample_energy": fe_.describe()}
 
-    # ---- S4 dose-response across coupling deciles ------------------------------------------------
+
+def dose_response(ctx: PairContext) -> dict:
+    """S4: AI slope in each coupling decile and its area-weighted linear trend."""
+    p = ctx.p
     rows, boots = [], []
     for k in range(1, 11):
-        mk = core & (p.decile == k)[None, :]
-        fk = fit(p, mk, {"ai": e_ai, "ifs": e_ifs})
-        va_, ba_ = lead_mean(fk.sums["ai"], prim, counts)
-        vi_, bi_ = lead_mean(fk.sums["ifs"], prim, counts)
-        rows.append({"decile": k, "beta_ai": va_, "beta_ifs": vi_,
-                     "ai_ci95": np.quantile(ba_, [0.025, 0.975]).tolist(),
-                     "ifs_ci95": np.quantile(bi_, [0.025, 0.975]).tolist(),
+        fk = ctx.pair_fit(ctx.core & (p.decile == k)[None, :])
+        va, ba = ctx.mean(fk.sums["ai"])
+        vi, bi = ctx.mean(fk.sums["ifs"])
+        rows.append({"decile": k, "beta_ai": va, "beta_ifs": vi,
+                     "ai_ci95": np.quantile(ba, [0.025, 0.975]).tolist(),
+                     "ifs_ci95": np.quantile(bi, [0.025, 0.975]).tolist(),
                      "area_weight": float(p.weight[p.decile == k].sum()), **fk.describe()})
-        boots.append(ba_)
+        boots.append(ba)
     k_arr = np.arange(1, 11, dtype=float)
     wts = np.array([r["area_weight"] for r in rows])
     km = np.average(k_arr, weights=wts)
 
     def trend(values: np.ndarray) -> np.ndarray:
-        return ((values - np.average(values, weights=wts, axis=-1)[..., None]) * (k_arr - km) * wts
-                ).sum(axis=-1) / ((k_arr - km) ** 2 * wts).sum()
+        centred = values - np.average(values, weights=wts, axis=-1)[..., None]
+        return (centred * (k_arr - km) * wts).sum(axis=-1) / ((k_arr - km) ** 2 * wts).sum()
 
     est = trend(np.array([r["beta_ai"] for r in rows]))
-    out["S4_dose_response"] = {"trend_per_decile": summarize(float(est), trend(np.stack(boots, 1))),
-                               "deciles": rows}
+    return {"trend_per_decile": summarize(float(est), trend(np.stack(boots, 1))), "deciles": rows}
 
-    # ---- S5 wrong-year placebo -------------------------------------------------------------------
-    y0, y1 = cfg["placebo_years"]
+
+def wrong_year_placebo(ctx: PairContext, true_value: float) -> dict:
+    """S5: the AI slope with soil moisture from the same calendar day of each placebo year."""
+    p = ctx.p
+    y0, y1 = ctx.cfg["placebo_years"]
     prev = p.dates - pd.Timedelta(days=1)
-    true_val = out["primary"]["beta_ai"]["estimate"]
+    day_of_month = np.where((prev.month == 2) & (prev.day == 29), 28, prev.day)
     placebo = {}
     for year in range(y0, y1 + 1):
-        day_of_month = np.where((prev.month == 2) & (prev.day == 29), 28, prev.day)
         days = pd.to_datetime(pd.DataFrame({"year": year, "month": prev.month,
                                             "day": day_of_month}))
-        sp = cov.s.sel(day=days.values).values
-        fp = fit(p, water & np.isfinite(sp), {"ai": e_ai}, x=sp)
-        placebo[year] = float(fp.sums["ai"].beta[prim].mean())
+        sp = ctx.cov.s.sel(day=days.values).values
+        fp = fit(p, ctx.water & np.isfinite(sp), {"ai": ctx.e_ai}, x=sp)
+        placebo[year] = float(fp.sums["ai"].beta[ctx.prim].mean())
     vals = np.array(list(placebo.values()))
-    out["S5_placebo"] = {"true": true_val, "placebo": placebo,
-                         "rank_p": float((1 + (vals <= true_val).sum()) / (vals.size + 1)),
-                         "placebo_mean": float(vals.mean()), "placebo_sd": float(vals.std(ddof=1))}
+    return {"true": true_value, "placebo": placebo,
+            "rank_p": float((1 + (vals <= true_value).sum()) / (vals.size + 1)),
+            "placebo_mean": float(vals.mean()), "placebo_sd": float(vals.std(ddof=1))}
 
-    # ---- S6 circulation pathway (FGN only) -------------------------------------------------------
-    if "ez500_ai" in p.extra:
-        ez = p.extra["ez500_ai"]
-        m6 = water & np.isfinite(ez)
-        five = int(np.flatnonzero(lead_days == 5)[0])
-        y5 = {"ai5": e_ai[:, five, :]}
-        base = fit(p, m6, y5)
-        with_z = fit(p, m6, y5, controls=[p.a1, p.a2, ez])
-        zslope = fit(p, m6, {"z": ez})
-        b0, bz = base.sums["ai5"], with_z.sums["ai5"]
-        ratio_boot = bz.boot(counts)[:, 0] / b0.boot(counts)[:, 0]
-        out["S6_circulation"] = {
-            "beta_day5": summarize(float(b0.beta[0]), b0.boot(counts)[:, 0]),
-            "beta_day5_with_z500_error": summarize(float(bz.beta[0]), bz.boot(counts)[:, 0]),
-            "retained_fraction": summarize(float(bz.beta[0] / b0.beta[0]), ratio_boot,
-                                           alternative="two-sided"),
-            "z500_error_slope_m_per_sd": summarize(float(zslope.sums["z"].beta[0]),
-                                                   zslope.sums["z"].boot(counts)[:, 0],
-                                                   alternative="two-sided"),
-            "sample": base.describe()}
 
-    # ---- robustness ------------------------------------------------------------------------------
+def circulation(ctx: PairContext) -> dict | None:
+    """S6: the lead-day-5 AI slope with and without the Z500 forecast error as a control."""
+    p = ctx.p
+    if "ez500_ai" not in p.extra:
+        return None
+    ez = p.extra["ez500_ai"]
+    m6 = ctx.water & np.isfinite(ez)
+    five = int(np.flatnonzero(ctx.lead_days == 5)[0])
+    y5 = {"ai5": ctx.e_ai[:, five, :]}
+    base = fit(p, m6, y5)
+    with_z = fit(p, m6, y5, controls=[p.a1, p.a2, ez])
+    zslope = fit(p, m6, {"z": ez})
+    b0, bz, counts = base.sums["ai5"], with_z.sums["ai5"], ctx.counts
+    ratio_boot = bz.boot(counts)[:, 0] / b0.boot(counts)[:, 0]
+    return {
+        "beta_day5": summarize(float(b0.beta[0]), b0.boot(counts)[:, 0]),
+        "beta_day5_with_z500_error": summarize(float(bz.beta[0]), bz.boot(counts)[:, 0]),
+        "retained_fraction": summarize(float(bz.beta[0] / b0.beta[0]), ratio_boot,
+                                       alternative="two-sided"),
+        "z500_error_slope_m_per_sd": summarize(float(zslope.sums["z"].beta[0]),
+                                               zslope.sums["z"].boot(counts)[:, 0],
+                                               alternative="two-sided"),
+        "sample": base.describe()}
+
+
+def robustness(ctx: PairContext, f: Fit, d: SlopeSums) -> dict:
+    """R1-R5 and R7 (R6, Driscoll-Kraay errors, is reported inside every summary)."""
+    p, water = ctx.p, ctx.water
     rob: dict = {}
     alt_ok = all_finite(p.e["ai_afternoon_alt"], p.e["ifs_afternoon_alt"])
     fa = fit(p, water & alt_ok, {"ai": p.e["ai_afternoon_alt"], "ifs": p.e["ifs_afternoon_alt"]})
-    rob["R1_truth_swap"] = {"beta_ai": summary_mean(fa.sums["ai"], prim, counts, cfg),
-                            "beta_ifs": summary_mean(fa.sums["ifs"], prim, counts, cfg),
-                            "sample": fa.describe()}
-    for label, kwargs in {"cellmonth+date": {"fe": "cellmonth+date"}, "date_only": {"fe": "date"},
-                          "no_controls": {"controls": False}}.items():
-        fr = fit(p, water, {"ai": e_ai, "ifs": e_ifs}, **kwargs)
-        rob[f"R2_{label}"] = {"beta_ai": summary_mean(fr.sums["ai"], prim, counts, cfg),
-                              "delta": summary_mean(diff(fr.sums["ai"], fr.sums["ifs"]), prim,
-                                                    counts, cfg)}
-    rob["R3_block14"] = {"beta_ai": summary_mean(f.sums["ai"], prim, counts14, cfg),
-                         "delta": summary_mean(d, prim, counts14, cfg)}
-    fl = fit(p, water & np.isfinite(p.s_l1), {"ai": e_ai, "ifs": e_ifs}, x=p.s_l1)
-    rob["R4_surface_layer"] = {"beta_ai": summary_mean(fl.sums["ai"], prim, counts, cfg),
-                               "delta": summary_mean(diff(fl.sums["ai"], fl.sums["ifs"]), prim,
-                                                     counts, cfg)}
-    loo = {}
-    for cont in sorted(set(p.continent[(p.regime == "water") & p.usable])):
+    rob["R1_truth_swap"] = {"beta_ai": ctx.summary(fa.sums["ai"]),
+                            "beta_ifs": ctx.summary(fa.sums["ifs"]), "sample": fa.describe()}
+    variants: dict[str, dict[str, Any]] = {"cellmonth+date": {"fe": "cellmonth+date"},
+                                           "date_only": {"fe": "date"},
+                                           "no_controls": {"controls": False}}
+    for label, kwargs in variants.items():
+        fr = ctx.pair_fit(water, **kwargs)
+        rob[f"R2_{label}"] = {"beta_ai": ctx.summary(fr.sums["ai"]),
+                              "delta": ctx.summary(diff(fr.sums["ai"], fr.sums["ifs"]))}
+    rob["R3_block14"] = {"beta_ai": ctx.summary(f.sums["ai"], ctx.counts14),
+                         "delta": ctx.summary(d, ctx.counts14)}
+    fl = ctx.pair_fit(water & np.isfinite(p.s_l1), x=p.s_l1)
+    rob["R4_surface_layer"] = {"beta_ai": ctx.summary(fl.sums["ai"]),
+                               "delta": ctx.summary(diff(fl.sums["ai"], fl.sums["ifs"]))}
+    loo: dict[str, dict] = {}
+    water_cells = (p.regime == "water") & p.usable
+    for cont in sorted(set(p.continent[water_cells])):
         mc = water & (p.continent != cont)[None, :]
         if not mc.any():
             loo[cont] = {"skipped": "no water-limited cells outside this continent"}
             continue
-        fc = fit(p, mc, {"ai": e_ai, "ifs": e_ifs})
-        loo[cont] = {"beta_ai": summary_mean(fc.sums["ai"], prim, counts, cfg)["estimate"],
-                     "delta": summary_mean(diff(fc.sums["ai"], fc.sums["ifs"]), prim, counts,
-                                           cfg)["estimate"],
-                     "n_cells_dropped": int(((p.continent == cont) & (p.regime == "water")
-                                             & p.usable).sum())}
+        fc = ctx.pair_fit(mc)
+        loo[cont] = {"beta_ai": ctx.summary(fc.sums["ai"])["estimate"],
+                     "delta": ctx.summary(diff(fc.sums["ai"], fc.sums["ifs"]))["estimate"],
+                     "n_cells_dropped": int((water_cells & (p.continent == cont)).sum())}
     rob["R5_leave_one_continent_out"] = loo
     inj = {}
-    for kappa in cfg["injection_kappas"]:
-        e_syn = e_ifs - kappa * p.s[:, None, :]
-        fi = fit(p, water, {"syn": e_syn, "ifs": e_ifs})
-        rec = float(diff(fi.sums["syn"], fi.sums["ifs"]).beta[prim].mean())
+    for kappa in ctx.cfg["injection_kappas"]:
+        e_syn = ctx.e_ifs - kappa * p.s[:, None, :]
+        fi = fit(p, water, {"syn": e_syn, "ifs": ctx.e_ifs})
+        rec = float(diff(fi.sums["syn"], fi.sums["ifs"]).beta[ctx.prim].mean())
         inj[str(kappa)] = {"injected": -kappa, "recovered": rec, "abs_error": abs(rec + kappa)}
     rob["R7_injection"] = inj
-    out["robustness"] = rob
+    return rob
 
-    # ---- exploratory, not pre-registered: slopes of the truth and of each forecast ---------------
-    # e = truth - forecast, so beta_e = beta_truth - beta_forecast exactly on the same sample.
+
+def level_slopes(ctx: PairContext) -> dict:
+    """Exploratory, not pre-registered: slopes of the truth and of each forecast on *s*.
+
+    e = truth - forecast, so beta_e = beta_truth - beta_forecast exactly on the same sample.
+    """
+    p = ctx.p
     levels = {"truth": p.extra["truth_level"], "ai": p.extra["ai_level"],
               "ifs": p.extra["ifs_level"]}
     expl = {}
-    for label, fe in (("cell+date", "cell+date"), ("cellmonth+date", "cellmonth+date")):
-        fx = fit(p, water, levels, fe=fe)
-        expl[label] = {k: {"lead_profile": fx.sums[k].beta.tolist(),
-                           "mean_3_10": summarize(*lead_mean(fx.sums[k], prim, counts),
-                                                  alternative="two-sided")}
-                       for k in levels}
-    out["exploratory_level_slopes"] = expl
+    for fe in ("cell+date", "cellmonth+date"):
+        fx = fit(p, ctx.water, levels, fe=fe)
+        expl[fe] = {k: {"lead_profile": fx.sums[k].beta.tolist(),
+                        "mean_3_10": summarize(*ctx.mean(fx.sums[k]), alternative="two-sided")}
+                    for k in levels}
+    return expl
+
+
+def analyze_pair(cfg: Config, cov: xr.Dataset, name: str) -> dict:
+    """Every registered test for one model pair (preregistration §5-7)."""
+    ctx = make_context(cfg, cov, name)
+    out, f, d = primary(ctx)
+    out["S1_lead_growth"] = lead_growth(ctx, d)
+    s2 = diurnal(ctx)
+    if s2 is not None:
+        out["S2_diurnal"] = s2
+    out["S3_regime"] = regime_contrast(ctx, f, d)
+    out["S4_dose_response"] = dose_response(ctx)
+    out["S5_placebo"] = wrong_year_placebo(ctx, out["primary"]["beta_ai"]["estimate"])
+    s6 = circulation(ctx)
+    if s6 is not None:
+        out["S6_circulation"] = s6
+    out["robustness"] = robustness(ctx, f, d)
+    out["exploratory_level_slopes"] = level_slopes(ctx)
     return out
 
 

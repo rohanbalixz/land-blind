@@ -13,7 +13,8 @@ from landblind.config import DEFAULT_CONFIG, load_config
 def _setup_logging(root: Path, name: str) -> None:
     logs = root / "logs"
     logs.mkdir(exist_ok=True)
-    handlers = [logging.StreamHandler(sys.stdout), logging.FileHandler(logs / f"{name}.log")]
+    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout),
+                                       logging.FileHandler(logs / f"{name}.log")]
     logging.basicConfig(level=logging.INFO, handlers=handlers,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 

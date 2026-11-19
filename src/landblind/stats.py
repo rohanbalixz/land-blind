@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from scipy import sparse
@@ -202,7 +203,7 @@ def summarize(value: float, boot: np.ndarray, *, sesoi: float | None = None,
         p = float(norm.sf(z))
     else:
         p = float(2 * norm.sf(abs(z)))
-    out = {
+    out: dict[str, Any] = {
         "estimate": float(value),
         "se_boot": se,
         "ci95": [float(np.quantile(boot, 0.025)), float(np.quantile(boot, 0.975))],
