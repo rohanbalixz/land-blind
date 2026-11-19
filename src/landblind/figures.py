@@ -39,8 +39,10 @@ def _style() -> None:
 def _save(fig: plt.Figure, cfg: Config, name: str) -> None:
     out = cfg.results / "figures"
     out.mkdir(parents=True, exist_ok=True)
-    for ext in ("png", "pdf"):
-        fig.savefig(out / f"{name}.{ext}", dpi=220, bbox_inches="tight")
+    # Fixed metadata keeps the files byte-identical across reruns.
+    fig.savefig(out / f"{name}.png", dpi=220, bbox_inches="tight", metadata={"Software": None})
+    fig.savefig(out / f"{name}.pdf", bbox_inches="tight",
+                metadata={"CreationDate": None, "Producer": None, "Creator": None})
     plt.close(fig)
     log.info("wrote %s", out / f"{name}.png")
 
