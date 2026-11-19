@@ -193,7 +193,7 @@ results/                    outputs, committed with the code commit that produce
   author  = {Bali, Rohan},
   title   = {land-blind: {AI} weather ensembles miss the soil moisture they never see},
   year    = {2026},
-  version = {1.0.0},
+  version = {1.0.1},
   url     = {https://github.com/rohanbalixz/land-blind}
 }
 ```
