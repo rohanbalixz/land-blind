@@ -8,7 +8,7 @@ env:
 	conda env create -f environment.yml
 
 lint:
-	ruff check src tests
+	ruff check src tests scripts
 
 test:
 	$(PY) -m pytest

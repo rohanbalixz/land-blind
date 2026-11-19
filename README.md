@@ -6,11 +6,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/rohanbalixz/land-blind/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Frohanbalixz%2Fland-blind%2Fbadges%2Fci.json"></a>
-  <a href="docs/preregistration.md"><img alt="Pre-registered" src="https://img.shields.io/badge/pre--registered-2026--11--18-e8590c"></a>
-  <a href="https://www.python.org"><img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-2a78d6"></a>
-  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-1baf7a"></a>
-  <a href="https://weatherbench2.readthedocs.io"><img alt="Data: WeatherBench 2" src="https://img.shields.io/badge/data-WeatherBench%202-6250d6"></a>
+  <a href="https://github.com/rohanbalixz/land-blind/actions/workflows/ci.yml"><img alt="CI: passed" src="https://raw.githubusercontent.com/rohanbalixz/land-blind/badges/ci.svg"></a>
+  <a href="docs/preregistration.md"><img alt="Pre-registered 2026-11-18" src="docs/badges/preregistered.svg"></a>
+  <a href="https://www.python.org"><img alt="Python 3.11+" src="docs/badges/python.svg"></a>
+  <a href="LICENSE"><img alt="MIT licence" src="docs/badges/licence.svg"></a>
+  <a href="https://weatherbench2.readthedocs.io"><img alt="Data: WeatherBench 2" src="docs/badges/data.svg"></a>
 </p>
 
 ---
@@ -161,6 +161,7 @@ src/landblind/
   analysis.py, report.py    the registered tests and the generated summary
   figures.py
 tests/                      unit tests and the synthetic end-to-end test
+scripts/make_badges.py      README badges as self-contained SVG files
 results/                    outputs, committed with the code commit that produced them
 ```
 

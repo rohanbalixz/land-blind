@@ -18,11 +18,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
       - name: Lint
-        run: ruff check src tests
+        run: ruff check src tests scripts
       - name: Test
         run: python -m pytest
 
-  # Publishes the README badge from the real result of the test job:
+  # Publishes the README CI badge from the real result of the test job:
   # green "passed" on success, red "failed" otherwise. Pushes to main only.
   badge:
     needs: test
@@ -31,17 +31,22 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Write badge to the badges branch
         env:
           RESULT: ${{ needs.test.result }}
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "$RESULT" = "success" ]; then msg=passed; color=1baf7a; else msg=failed; color=e34948; fi
-          mkdir badge && cd badge
-          printf '{"schemaVersion": 1, "label": "CI", "message": "%s", "color": "%s"}\n' "$msg" "$color" > ci.json
+          if [ "$RESULT" = "success" ]; then status=passed; else status=failed; fi
+          mkdir "$RUNNER_TEMP/badge"
+          python scripts/make_badges.py ci "$status" "$RUNNER_TEMP/badge/ci.svg"
+          cd "$RUNNER_TEMP/badge"
           git init -q -b badges
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add ci.json
-          git commit -q -m "CI badge: $msg"
+          git add ci.svg
+          git commit -q -m "CI badge: $status"
           git push -q -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" badges
