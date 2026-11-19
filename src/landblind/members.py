@@ -8,12 +8,12 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from landmem.climatology import noleap_doy
-from landmem.config import Config
-from landmem.grid import Cells
-from landmem.mirror import Store, open_dataset, require
-from landmem.panels import cells_from_covariates, lead_hours, read_truth, target_offsets
-from landmem.scores import crps_fair, ensemble_moments, exceedance_probability
+from landblind.climatology import noleap_doy
+from landblind.config import Config
+from landblind.grid import Cells
+from landblind.mirror import Store, open_dataset, require
+from landblind.panels import cells_from_covariates, lead_hours, read_truth, target_offsets
+from landblind.scores import crps_fair, ensemble_moments, exceedance_probability
 
 log = logging.getLogger(__name__)
 

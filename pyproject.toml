@@ -1,20 +1,22 @@
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "land-memory"
-version = "0.1.0"
-description = "Tests whether AI weather ensembles miss the soil moisture they never see."
+name = "land-blind"
+version = "1.0.0"
+description = "Pre-registered test of whether AI weather ensembles miss the soil moisture they never see."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Rohan Bali" }]
 dependencies = [
     "numpy>=2.0",
     "pandas>=2.2",
     "scipy>=1.13",
     "xarray>=2024.10",
+    "netCDF4>=1.6",
     "zarr>=3.0",
     "numcodecs>=0.13",
     "matplotlib>=3.9",
@@ -23,10 +25,13 @@ dependencies = [
 
 [project.optional-dependencies]
 maps = ["cartopy>=0.24"]
-dev = ["pytest>=8", "ruff>=0.6"]
+dev = ["pytest>=8", "ruff==0.17.5"]
+
+[project.urls]
+Repository = "https://github.com/rohanbalixz/land-blind"
 
 [project.scripts]
-landmem = "landmem.cli:main"
+landblind = "landblind.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

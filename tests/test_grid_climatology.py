@@ -2,14 +2,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from landmem.climatology import (
+from landblind.climatology import (
     doy_mean_sd,
     doy_quantile,
     in_season,
     noleap_doy,
     warmest_months,
 )
-from landmem.grid import Cells, assign_continents, local_solar_hour, nearest_utc_offset
+from landblind.grid import Cells, assign_continents, local_solar_hour, nearest_utc_offset
 
 
 @pytest.mark.parametrize(

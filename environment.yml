@@ -1,5 +1,5 @@
 # Exact environment used for the published results (conda-forge, macOS arm64 and Linux x86-64).
-name: landmem
+name: landblind
 channels:
   - conda-forge
 dependencies:

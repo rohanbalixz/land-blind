@@ -9,17 +9,17 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from landmem.climatology import (
+from landblind.climatology import (
     doy_mean_sd,
     doy_quantile,
     in_season,
     noleap_doy,
     warmest_months,
 )
-from landmem.config import Config
-from landmem.fetch import ERA5_DAILY_VARS, ROOT_ZONE
-from landmem.grid import Cells, assign_continents, candidate_land_cells, nearest_utc_offset
-from landmem.mirror import Store, open_dataset, require
+from landblind.config import Config
+from landblind.fetch import ERA5_DAILY_VARS, ROOT_ZONE
+from landblind.grid import Cells, assign_continents, candidate_land_cells, nearest_utc_offset
+from landblind.mirror import Store, open_dataset, require
 
 log = logging.getLogger(__name__)
 
@@ -167,7 +167,7 @@ def build_covariates(cfg: Config) -> xr.Dataset:
         },
         coords={"day": days.values, "day6": day_index.values, "doy": np.arange(1, 366)},
         attrs={
-            "description": "ERA5-only covariates for land-memory (preregistration section 4).",
+            "description": "ERA5-only covariates for land-blind (preregistration section 4).",
             "tci_tercile_bounds": [float(t1), float(t2)],
             "n_candidate_cells": cand.size,
         },

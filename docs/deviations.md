@@ -20,3 +20,4 @@ exactly what was added once the results were known.
 | 4 | 2026-11-18 | **Exploratory, not pre-registered:** slopes of the truth and of each forecast on *s* (`exploratory_level_slopes`), under the registered and the cell × month fixed effects. | None. Added to interpret the error slopes. These are observational associations, not causal effects of soil moisture. |
 | 5 | 2026-11-18 | S3–S5 are also reported for GenCast. The plan registered them for FGN only; the GenCast rows are labelled "not registered". | None. |
 | 6 | 2026-11-18 | Figure 5 (hot-day probabilities by soil-moisture stratum) added. | None (presentation of S7). |
+| 7 | 2026-11-18 | Project renamed from `land-memory` to `land-blind` (Python package `landmem` → `landblind`) for publication. The registered files are byte-identical (SHA-256 unchanged). | None. |

@@ -11,11 +11,11 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from landmem.climatology import in_season
-from landmem.config import Config
-from landmem.mirror import manifest_digest
-from landmem.report import render
-from landmem.stats import (
+from landblind.climatology import in_season
+from landblind.config import Config
+from landblind.mirror import manifest_digest
+from landblind.report import render
+from landblind.stats import (
     Sample,
     SlopeSums,
     block_counts,

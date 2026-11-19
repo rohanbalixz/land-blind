@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from landmem.stats import (
+from landblind.stats import (
     Sample,
     block_counts,
     demean,

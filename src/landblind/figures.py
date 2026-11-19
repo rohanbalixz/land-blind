@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
-from landmem.config import Config
+from landblind.config import Config
 
 log = logging.getLogger(__name__)
 

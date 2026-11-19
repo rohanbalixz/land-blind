@@ -1,11 +1,14 @@
 cff-version: 1.2.0
 message: "If you use this software or its results, please cite it as below."
-title: "land-memory: do AI weather ensembles miss the soil moisture they never see?"
+title: "land-blind: AI weather ensembles miss the soil moisture they never see"
 type: software
 authors:
   - family-names: Bali
     given-names: Rohan
-version: 0.1.0
+version: 1.0.0
+date-released: 2026-11-18
+repository-code: https://github.com/rohanbalixz/land-blind
+url: https://github.com/rohanbalixz/land-blind
 license: MIT
 keywords:
   - AI weather prediction

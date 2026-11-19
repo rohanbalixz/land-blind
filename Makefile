@@ -14,22 +14,22 @@ test:
 	$(PY) -m pytest
 
 fetch:                      ## about 30 GB from the public WeatherBench 2 bucket
-	$(PY) -m landmem fetch metadata era5 forecasts truth members --workers $(WORKERS)
+	$(PY) -m landblind fetch metadata era5 forecasts truth members --workers $(WORKERS)
 
 covariates:                 ## ERA5 only: domain, soil-moisture anomalies, coupling regime
-	$(PY) -m landmem covariates
+	$(PY) -m landblind covariates
 
 extract: covariates         ## afternoon/night forecast and truth panels
-	$(PY) -m landmem extract
+	$(PY) -m landblind extract
 
 members: covariates         ## lead-day-5 ensemble scores for S7-S9
-	$(PY) -m landmem members
+	$(PY) -m landblind members
 
 analyze:                    ## registered tests -> results/results.json and results/tables
-	$(PY) -m landmem analyze
+	$(PY) -m landblind analyze
 
 figures:
-	$(PY) -m landmem figures
+	$(PY) -m landblind figures
 
 all: fetch extract members analyze figures
 

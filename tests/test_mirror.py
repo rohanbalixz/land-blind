@@ -5,8 +5,8 @@ import json
 
 import pytest
 
-from landmem import mirror
-from landmem.mirror import Store, _md5_from_header, chunk_keys, fetch_key
+from landblind import mirror
+from landblind.mirror import Store, _md5_from_header, chunk_keys, fetch_key
 
 META = {
     "x/.zarray": {"shape": [10, 6, 4], "chunks": [4, 6, 4], "dimension_separator": "."},

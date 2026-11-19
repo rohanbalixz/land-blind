@@ -28,7 +28,7 @@ import xarray as xr
 
 log = logging.getLogger(__name__)
 
-USER_AGENT = "land-memory/0.1 (research software; python-urllib)"
+USER_AGENT = "land-blind/1.0 (research software; python-urllib)"
 METADATA_KEYS = (".zmetadata", ".zgroup", ".zattrs")
 COORD_LIKE = {"time", "latitude", "longitude", "level", "prediction_timedelta", "number",
               "sample", "lead_time_secs", "dayofyear", "hour"}

@@ -9,9 +9,9 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from landmem.config import Config
-from landmem.grid import Cells, nearest_utc_offset
-from landmem.mirror import Store, open_dataset, require
+from landblind.config import Config
+from landblind.grid import Cells, nearest_utc_offset
+from landblind.mirror import Store, open_dataset, require
 
 log = logging.getLogger(__name__)
 

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from landmem.scores import crps_fair, ensemble_moments, exceedance_probability
+from landblind.scores import crps_fair, ensemble_moments, exceedance_probability
 
 
 def brute_force_fair_crps(x: np.ndarray, y: float) -> float:

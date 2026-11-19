@@ -7,8 +7,8 @@ import logging
 import numpy as np
 import pandas as pd
 
-from landmem.config import Config
-from landmem.mirror import Store, fetch_metadata, fetch_selection, open_dataset
+from landblind.config import Config
+from landblind.mirror import Store, fetch_metadata, fetch_selection, open_dataset
 
 log = logging.getLogger(__name__)
 

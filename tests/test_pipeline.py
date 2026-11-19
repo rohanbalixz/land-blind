@@ -9,9 +9,9 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from landmem.analysis import run_analysis
-from landmem.config import load_config
-from landmem.figures import draw_figures
+from landblind.analysis import run_analysis
+from landblind.config import load_config
+from landblind.figures import draw_figures
 
 BETA = -0.30
 N_CELLS = 90
