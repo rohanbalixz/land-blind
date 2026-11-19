@@ -101,8 +101,10 @@ def placebo(cfg: Config, res: dict) -> None:
     ax.scatter(vals, rng.uniform(-0.25, 0.25, vals.size), s=22, color=INK_2, alpha=0.7,
                label="Soil moisture from a wrong year (1990–2019)")
     ax.scatter([s5["true"]], [0], s=70, color=AI, zorder=3, label="Soil moisture from 2022")
-    ax.annotate(f"2022: {s5['true']:+.3f}\nrank p = {s5['rank_p']:.3f}", (s5["true"], 0),
-                xytext=(0, 14), textcoords="offset points", ha="center", fontsize=8)
+    below = int((vals > s5["true"]).sum())
+    ax.annotate(f"2022: {s5['true']:+.3f}\nbelow {below} of {vals.size} wrong years",
+                (s5["true"], 0), xytext=(0, 14), textcoords="offset points", ha="left",
+                fontsize=8)
     span = max(np.ptp(np.append(vals, s5["true"])), 0.05)
     lo_x = min(vals.min(), s5["true"]) - 0.12 * span
     hi_x = max(vals.max(), s5["true"]) + 0.12 * span
@@ -146,10 +148,36 @@ def regime_map(cfg: Config) -> None:
     _save(fig, cfg, "fig4_coupling_map")
 
 
+def hot_day_probabilities(cfg: Config, res: dict) -> None:
+    m = res.get("members_fgn2022")
+    if m is None:
+        return
+    groups = [("dry", "Dry soils (s < −0.43)"), ("wet", "Wet soils (s > 0.43)")]
+    bars = [("obs_freq", "Observed", INK_2), ("p_fgn", "FGN", AI), ("p_ifs", "IFS ENS", IFS)]
+    fig, ax = plt.subplots(figsize=(5.4, 3.2))
+    width = 0.24
+    for gi, (key, _) in enumerate(groups):
+        z = m[f"strata_{key}"]
+        for bi, (field, label, color) in enumerate(bars):
+            x = gi + (bi - 1) * (width + 0.03)
+            ax.bar(x, 100 * z[field], width=width, color=color, label=label if gi == 0 else None)
+            ax.text(x, 100 * z[field] + 0.4, f"{100 * z[field]:.1f}", ha="center", fontsize=7.5)
+    ax.set_xticks(range(len(groups)), [g[1] for g in groups])
+    ax.set_ylabel("Hot afternoons, lead day 5 (%)")
+    ax.set_title("Hot-day probability by initial soil moisture, 2022", loc="left")
+    ax.grid(axis="x", visible=False)
+    ax.legend(loc="upper right", fontsize=8)
+    fig.text(0.01, -0.1, "Hot: above the local hour-matched 90th percentile (ERA5 1990–2019).\n"
+             "Water-limited cells, warm season, every second 00 UTC initialisation; truth HRES-t0.",
+             fontsize=7.5, color=INK_2)
+    _save(fig, cfg, "fig5_hot_day_probability")
+
+
 def draw_figures(cfg: Config) -> None:
     _style()
     res = json.loads((cfg.results / "results.json").read_text())
     lead_profiles(cfg, res)
     coupling_deciles(cfg, res)
     placebo(cfg, res)
+    hot_day_probabilities(cfg, res)
     regime_map(cfg)

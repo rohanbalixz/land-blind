@@ -68,12 +68,13 @@ def render(results: dict) -> str:
         if "S2_diurnal" in pr:
             lines.append(_row("S2 afternoon − night Δβ̄", pr["S2_diurnal"]["afternoon_minus_night"]))
         s3 = pr["S3_regime"]
-        lines += [_row("S3 Δβ̄ water − energy", s3["delta_water_minus_energy"]),
-                  _row("S3 β̄ AI water − energy", s3["beta_ai_water_minus_energy"]),
-                  _row("S4 trend of β̄ AI per coupling decile",
+        tag = "" if name == "fgn2022" else " (not registered for GenCast)"
+        lines += [_row("S3 Δβ̄ water − energy" + tag, s3["delta_water_minus_energy"]),
+                  _row("S3 β̄ AI water − energy" + tag, s3["beta_ai_water_minus_energy"]),
+                  _row("S4 trend of β̄ AI per coupling decile" + tag,
                        pr["S4_dose_response"]["trend_per_decile"])]
         s5 = pr["S5_placebo"]
-        lines.append(f"| S5 wrong-year placebo (true β̄ AI vs 30 placebo years) | "
+        lines.append(f"| S5 wrong-year placebo (true β̄ AI vs 30 placebo years){tag} | "
                      f"{s5['true']:+.3f} | placebo mean {s5['placebo_mean']:+.3f}, "
                      f"sd {s5['placebo_sd']:.3f} | rank p {s5['rank_p']:.3f} |")
         if "S6_circulation" in pr:
