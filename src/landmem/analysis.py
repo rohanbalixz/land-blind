@@ -70,7 +70,9 @@ def load_pair(cfg: Config, cov: xr.Dataset, name: str) -> PairData:
         e[f"ai_{when}_alt"] = alt - ai
         e[f"ifs_{when}_alt"] = alt - ifs
     start = cov.season_start_month.values.astype(int)
-    extra = {}
+    extra = {"truth_level": panel["truth_afternoon"].values,
+             "ai_level": panel["ai_afternoon"].values,
+             "ifs_level": panel["ifs_afternoon"].values}
     if "ai_z500_day5" in panel:
         extra["ez500_ai"] = panel.truth_z500_day5.values - panel.ai_z500_day5.values
     return PairData(
@@ -330,6 +332,19 @@ def analyze_pair(cfg: Config, cov: xr.Dataset, name: str) -> dict:
         inj[str(kappa)] = {"injected": -kappa, "recovered": rec, "abs_error": abs(rec + kappa)}
     rob["R7_injection"] = inj
     out["robustness"] = rob
+
+    # ---- exploratory, not pre-registered: slopes of the truth and of each forecast ---------------
+    # e = truth - forecast, so beta_e = beta_truth - beta_forecast exactly on the same sample.
+    levels = {"truth": p.extra["truth_level"], "ai": p.extra["ai_level"],
+              "ifs": p.extra["ifs_level"]}
+    expl = {}
+    for label, fe in (("cell+date", "cell+date"), ("cellmonth+date", "cellmonth+date")):
+        fx = fit(p, water, levels, fe=fe)
+        expl[label] = {k: {"lead_profile": fx.sums[k].beta.tolist(),
+                           "mean_3_10": summarize(*lead_mean(fx.sums[k], prim, counts),
+                                                  alternative="two-sided")}
+                       for k in levels}
+    out["exploratory_level_slopes"] = expl
     return out
 
 

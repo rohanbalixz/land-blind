@@ -102,6 +102,15 @@ def render(results: dict) -> str:
                          f"{r['beta_ai']:+.3f} | {r['delta']:+.3f} |")
         worst = max(v["abs_error"] for v in rob["R7_injection"].values())
         lines.append(f"| R7 injection recovery, max abs error | {worst:.1e} | |")
+        if "exploratory_level_slopes" in pr:
+            lines += ["", "Exploratory, not pre-registered: slope of each level on *s* (K per SD, "
+                      "lead days 3–10). The error slope is the truth slope minus the forecast "
+                      "slope.", "", "| Fixed effects | truth | AI forecast | IFS forecast |",
+                      "|---|---|---|---|"]
+            for fe, d in pr["exploratory_level_slopes"].items():
+                cells = " | ".join(f"{d[k]['mean_3_10']['estimate']:+.3f} {_ci(d[k]['mean_3_10'])}"
+                                   for k in ("truth", "ai", "ifs"))
+                lines.append(f"| {fe} | {cells} |")
     if "members_fgn2022" in results:
         m = results["members_fgn2022"]
         lines += ["", "## Ensemble members, FGN vs IFS ENS, lead day 5 (2022)", "",

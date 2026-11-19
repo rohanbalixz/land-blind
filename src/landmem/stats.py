@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
+from scipy import sparse
 from scipy.stats import norm
 
 Z80 = norm.ppf(0.80)
@@ -52,31 +53,39 @@ class Sample:
         """Weighted sums by date: (n,) -> (n_dates,), (n, L) -> (n_dates, L)."""
         if v.ndim == 1:
             return np.bincount(self.t, weights=self.w * v, minlength=self.n_dates)
-        return np.stack([self.date_sum(v[:, j]) for j in range(v.shape[1])], axis=1)
+        return _group_matrix(self.t, self.w, self.n_dates) @ v
+
+
+def _group_matrix(g: np.ndarray, w: np.ndarray, n_groups: int | None = None) -> sparse.csr_matrix:
+    """Sparse (group x observation) matrix of weights, so that ``G @ x`` sums ``w * x`` by group."""
+    n_groups = int(g.max()) + 1 if n_groups is None else n_groups
+    return sparse.csr_matrix((w, (g, np.arange(g.size))), shape=(n_groups, g.size))
 
 
 def demean(x: np.ndarray, groups: Sequence[np.ndarray], w: np.ndarray, *, tol: float = 1e-10,
-           max_iter: int = 2000) -> np.ndarray:
+           max_iter: int = 5000) -> np.ndarray:
     """Weighted projection of ``x`` (n,) or (n, k) off the fixed effects in ``groups``.
 
     Uses alternating projections (the method of Gaure, 2013, used in two-way fixed-effects
-    software); exact in one pass for a single set of fixed effects.
+    software); exact in one pass for a single set of fixed effects. Group means of all columns are
+    computed at once with sparse group matrices.
     """
     x = np.array(x, dtype=np.float64, copy=True)
     squeeze = x.ndim == 1
     if squeeze:
         x = x[:, None]
-    sums_w = [np.bincount(g, weights=w) for g in groups]
-    scale = max(float(np.nanmax(np.abs(x))), 1.0)
+    projections = []
+    for g in groups:
+        G = _group_matrix(g, w)
+        sw = np.asarray(G.sum(axis=1)).ravel()
+        projections.append((G, np.where(sw > 0, sw, 1.0), g))
+    scale = max(float(np.abs(x).max()), 1.0)
     for _ in range(max_iter):
         largest = 0.0
-        for g, sw in zip(groups, sums_w, strict=True):
-            for j in range(x.shape[1]):
-                means = np.bincount(g, weights=w * x[:, j], minlength=sw.size)
-                with np.errstate(invalid="ignore", divide="ignore"):
-                    means = np.where(sw > 0, means / sw, 0.0)
-                x[:, j] -= means[g]
-                largest = max(largest, float(np.abs(means).max()))
+        for G, sw, g in projections:
+            means = (G @ x) / sw[:, None]
+            x -= means[g]
+            largest = max(largest, float(np.abs(means).max()))
         if len(groups) == 1 or largest < tol * scale:
             break
     else:
