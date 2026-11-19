@@ -241,3 +241,21 @@ def fetch_selection(store: Store, names: Sequence[str], selection: Mapping[str, 
 def open_dataset(store: Store) -> xr.Dataset:
     """Open the local mirror lazily, without dask. Check selections with :func:`require` first."""
     return xr.open_zarr(store.local, consolidated=True, chunks=None, decode_timedelta=True)
+
+
+def manifest_digest(store: Store) -> dict:
+    """Object count, bytes and a SHA-256 over sorted ``key md5`` lines of the store's manifest.
+
+    Two mirrors with the same digest hold byte-identical chunks.
+    """
+    if not store.manifest.exists():
+        return {"objects": 0, "bytes": 0, "sha256": None}
+    entries = {}
+    for line in store.manifest.read_text().splitlines():
+        rec = json.loads(line)
+        entries[rec["key"]] = (rec["md5"], rec["bytes"])
+    digest = hashlib.sha256()
+    for key in sorted(entries):
+        digest.update(f"{key} {entries[key][0]}\n".encode())
+    return {"objects": len(entries), "bytes": int(sum(b for _, b in entries.values())),
+            "sha256": digest.hexdigest()}

@@ -13,6 +13,7 @@ import xarray as xr
 
 from landmem.climatology import in_season
 from landmem.config import Config
+from landmem.mirror import manifest_digest
 from landmem.report import render
 from landmem.stats import (
     Sample,
@@ -450,6 +451,7 @@ def run_analysis(cfg: Config, skip_members: bool = False) -> dict:
                    "water_cells_by_continent": pd.Series(
                        cov.continent.values.astype(str)[cov.regime.values.astype(str) == "water"]
                    ).value_counts().to_dict()},
+        "data_provenance": {name: manifest_digest(cfg.store(name)) for name in cfg["stores"]},
         "pairs": {},
     }
     for name in cfg["pairs"]:
